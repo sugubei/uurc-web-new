@@ -279,7 +279,7 @@ describe("App remote experience", () => {
     expect(metricValue(quality.metrics, "文本通道")).toBe("已打开");
   });
 
-  it("docks and drags the toolbar in the regular stage, with fullscreen, view mode, and shortcuts", async () => {
+  it("docks and drags the toolbar across the viewport, with fullscreen, view mode, and shortcuts", async () => {
     vi.stubGlobal("RTCPeerConnection", TestPeerConnection);
     appBackend.currentParticipants = [];
     const user = userEvent.setup();
@@ -295,28 +295,34 @@ describe("App remote experience", () => {
     const stage = screen.getByRole("application", { name: "远控画面" }) as HTMLDivElement;
     const stageFrame = stage.parentElement as HTMLDivElement;
     const toolbar = screen.getByLabelText("远控主流程");
+    // 连上之后工具栏空闲几秒就会收起，先把指针放上去保持展开，才能断言拖动行为。
+    await user.hover(toolbar);
 
-    // 普通远控画布保持默认停靠位置，同时提供拖动把手。
+    // 未拖动时保持 CSS 默认停靠（画面顶部居中），同时提供拖动把手。
     const dragHandle = screen.getByRole("button", { name: "拖动工具栏" });
     expect(toolbar.style.position).toBe("");
     expect(stageFrame).not.toHaveClass("control-stage-frame--fullscreen");
 
-    vi.spyOn(toolbar.parentElement as HTMLElement, "getBoundingClientRect").mockReturnValue(
-      rectFrom({ left: 0, top: 0, width: 900, height: 500 }),
+    vi.stubGlobal("innerWidth", 1200);
+    vi.stubGlobal("innerHeight", 800);
+    // 画布只占视口左上角一小块：拖动范围按视口算，工具栏要能停到画布之外。
+    vi.spyOn(stageFrame, "getBoundingClientRect").mockReturnValue(
+      rectFrom({ left: 100, top: 100, width: 400, height: 300 }),
     );
     vi.spyOn(toolbar, "getBoundingClientRect").mockReturnValue(
-      rectFrom({ left: 300, top: 20, width: 420, height: 52 }),
+      rectFrom({ left: 150, top: 110, width: 420, height: 50 }),
     );
-    fireEvent.pointerDown(dragHandle, { pointerId: 1, clientX: 320, clientY: 40 });
-    fireEvent.pointerMove(dragHandle, { pointerId: 1, clientX: 430, clientY: 110 });
-    fireEvent.pointerUp(dragHandle, { pointerId: 1, clientX: 430, clientY: 110 });
+    fireEvent.pointerDown(dragHandle, { pointerId: 1, clientX: 170, clientY: 130 });
+    fireEvent.pointerMove(dragHandle, { pointerId: 1, clientX: 700, clientY: 500 });
+    fireEvent.pointerUp(dragHandle, { pointerId: 1, clientX: 700, clientY: 500 });
     await waitFor(() => {
+      // 锚点是水平中心与顶边：centerX = 700 + 190（把手按下点距中心 -190），top = 500 - 20。
+      // 890 已经超出画布右边界 500，说明拖动范围不再被画布限制。
       expect(toolbar).toHaveStyle({
         position: "fixed",
-        bottom: "auto",
-        left: "410px",
-        top: "90px",
-        transform: "none",
+        left: "890px",
+        top: "480px",
+        transform: "translateX(-50%)",
       });
     });
 

@@ -6,6 +6,7 @@ import { orderRemoteShortcutGroups, type RemoteShortcut } from "../remote/remote
 interface RemoteShortcutMenuProps {
   disabled: boolean;
   platformKey: string;
+  onOpenChange: (open: boolean) => void;
   onRemoteShortcut: (shortcut: RemoteShortcut) => void;
 }
 
@@ -20,12 +21,17 @@ const MENU_GAP = 8;
 const MENU_MARGIN = 8;
 const MENU_PREFERRED_WIDTH = 360;
 
-export function RemoteShortcutMenu({ disabled, platformKey, onRemoteShortcut }: RemoteShortcutMenuProps) {
+export function RemoteShortcutMenu({ disabled, platformKey, onOpenChange, onRemoteShortcut }: RemoteShortcutMenuProps) {
   const detailsRef = useRef<HTMLDetailsElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const groups = useMemo(() => orderRemoteShortcutGroups(platformKey), [platformKey]);
   const [open, setOpen] = useState(false);
   const [layout, setLayout] = useState<ShortcutMenuLayout | null>(null);
+
+  // 菜单打开期间工具栏不能自动收起，否则面板会跟着一起消失。
+  useEffect(() => {
+    onOpenChange(open);
+  }, [onOpenChange, open]);
 
   const updateLayout = useCallback(() => {
     const details = detailsRef.current;

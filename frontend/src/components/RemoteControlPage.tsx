@@ -115,7 +115,7 @@ export function RemoteControlPage(props: RemoteControlPageProps) {
           <RemoteReconnectBanner {...props.reconnect} />
           <RemoteCommandBar {...props.commandBar} onNextAction={handlePrimaryAction} />
           {shell.isFullscreen ? (
-            <div className="fullscreen-hint">工具栏可拖到任意位置 · 无操作 2 秒后自动隐藏 · Esc 退出全屏</div>
+            <div className="fullscreen-hint">工具栏可拖到任意位置 · 移开鼠标后自动收起 · Esc 退出全屏</div>
           ) : null}
         </div>
         <AnimatePresence initial={false}>

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 
-type FloatingPanelPosition = {
-  left: number;
+type FloatingPanelAnchor = {
+  centerX: number;
   top: number;
 };
 
@@ -17,100 +17,70 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function constrainPanelPosition(panel: HTMLElement, left: number, top: number): FloatingPanelPosition {
-  const panelRect = panel.getBoundingClientRect();
-  const parentRect = panel.parentElement?.getBoundingClientRect();
-  const hasParentBounds = Boolean(parentRect && parentRect.width > 0 && parentRect.height > 0);
-  const minLeft = Math.max(PANEL_MARGIN, hasParentBounds ? parentRect!.left + PANEL_MARGIN : PANEL_MARGIN);
-  const minTop = Math.max(PANEL_MARGIN, hasParentBounds ? parentRect!.top + PANEL_MARGIN : PANEL_MARGIN);
-  const maxLeft = Math.max(
-    minLeft,
-    Math.min(
-      window.innerWidth - panelRect.width - PANEL_MARGIN,
-      hasParentBounds
-        ? parentRect!.right - panelRect.width - PANEL_MARGIN
-        : window.innerWidth - panelRect.width - PANEL_MARGIN,
-    ),
-  );
-  const maxTop = Math.max(
-    minTop,
-    Math.min(
-      window.innerHeight - panelRect.height - PANEL_MARGIN,
-      hasParentBounds
-        ? parentRect!.bottom - panelRect.height - PANEL_MARGIN
-        : window.innerHeight - panelRect.height - PANEL_MARGIN,
-    ),
-  );
+// 锚点是面板的水平中心与顶边，取值范围是整个视口：工具栏可以停到顶栏、侧栏等画面之外的位置。
+function constrainPanelAnchor(panel: HTMLElement, centerX: number, top: number): FloatingPanelAnchor {
+  const rect = panel.getBoundingClientRect();
+  const halfWidth = rect.width / 2;
+  const minCenterX = PANEL_MARGIN + halfWidth;
+  const maxCenterX = Math.max(minCenterX, window.innerWidth - PANEL_MARGIN - halfWidth);
+  const maxTop = Math.max(PANEL_MARGIN, window.innerHeight - PANEL_MARGIN - rect.height);
 
   return {
-    left: clamp(left, minLeft, maxLeft),
-    top: clamp(top, minTop, maxTop),
+    centerX: clamp(centerX, minCenterX, maxCenterX),
+    top: clamp(top, PANEL_MARGIN, maxTop),
   };
 }
 
-export function useDraggableFloatingPanel<T extends HTMLElement>(enabled = true) {
+export function useDraggableFloatingPanel<T extends HTMLElement>() {
   const panelRef = useRef<T | null>(null);
   const dragStateRef = useRef<DragState | null>(null);
-  const [position, setPosition] = useState<FloatingPanelPosition | null>(null);
+  const [anchor, setAnchor] = useState<FloatingPanelAnchor | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const hasPosition = position !== null;
-
-  // 禁用拖拽时清掉自定义坐标，让工具栏回到 CSS 中定义的停靠位置。
-  useEffect(() => {
-    if (!enabled) setPosition(null);
-  }, [enabled]);
+  const hasAnchor = anchor !== null;
 
   const panelStyle = useMemo<CSSProperties | undefined>(() => {
-    if (!enabled || !position) return undefined;
-    // 拖动后用 position:fixed + 视口坐标，避免父级布局变化造成位置跳动。
+    if (!anchor) return undefined;
+    // 拖动后改用 position:fixed + 视口坐标，避免父级布局变化造成位置跳动。
+    // transform 与 CSS 默认停靠写的是同一个值，首次拖拽不会触发 transform 过渡。
     return {
       position: "fixed",
-      bottom: "auto",
-      left: `${position.left}px`,
-      top: `${position.top}px`,
-      transform: "none",
+      left: `${anchor.centerX}px`,
+      top: `${anchor.top}px`,
+      transform: "translateX(-50%)",
     };
-  }, [enabled, position]);
+  }, [anchor]);
 
   const moveToPointer = useCallback((clientX: number, clientY: number) => {
     const panel = panelRef.current;
     const dragState = dragStateRef.current;
     if (!panel || !dragState) return;
 
-    setPosition(constrainPanelPosition(panel, clientX - dragState.offsetX, clientY - dragState.offsetY));
+    setAnchor(constrainPanelAnchor(panel, clientX - dragState.offsetX, clientY - dragState.offsetY));
   }, []);
 
-  const clampCurrentPosition = useCallback(() => {
+  // 折叠与展开会改变面板尺寸，尺寸变化后要把锚点重新收回视口内。
+  const clampAnchor = useCallback(() => {
     const panel = panelRef.current;
     if (!panel) return;
-    setPosition((current) => {
+    setAnchor((current) => {
       if (!current) return current;
-      const next = constrainPanelPosition(panel, current.left, current.top);
-      return next.left === current.left && next.top === current.top ? current : next;
+      const next = constrainPanelAnchor(panel, current.centerX, current.top);
+      return next.centerX === current.centerX && next.top === current.top ? current : next;
     });
   }, []);
 
   useEffect(() => {
-    if (!enabled || !hasPosition) return;
+    if (!hasAnchor) return;
     const panel = panelRef.current;
-    const parent = panel?.parentElement;
-    const resizeObserver = typeof ResizeObserver === "function" ? new ResizeObserver(clampCurrentPosition) : undefined;
+    const resizeObserver = typeof ResizeObserver === "function" ? new ResizeObserver(clampAnchor) : undefined;
     if (panel) resizeObserver?.observe(panel);
-    if (parent) resizeObserver?.observe(parent);
 
-    const mutationObserver =
-      typeof MutationObserver === "function" && parent ? new MutationObserver(clampCurrentPosition) : undefined;
-    mutationObserver?.observe(parent!, { attributes: true, attributeFilter: ["class", "style"] });
-
-    window.addEventListener("resize", clampCurrentPosition);
-    window.addEventListener("scroll", clampCurrentPosition, true);
+    window.addEventListener("resize", clampAnchor);
     return () => {
       resizeObserver?.disconnect();
-      mutationObserver?.disconnect();
-      window.removeEventListener("resize", clampCurrentPosition);
-      window.removeEventListener("scroll", clampCurrentPosition, true);
+      window.removeEventListener("resize", clampAnchor);
     };
-  }, [clampCurrentPosition, enabled, hasPosition]);
+  }, [clampAnchor, hasAnchor]);
 
   const onPointerDown = useCallback((event: PointerEvent<HTMLElement>) => {
     const panel = panelRef.current;
@@ -119,7 +89,7 @@ export function useDraggableFloatingPanel<T extends HTMLElement>(enabled = true)
     const panelRect = panel.getBoundingClientRect();
     dragStateRef.current = {
       pointerId: event.pointerId,
-      offsetX: event.clientX - panelRect.left,
+      offsetX: event.clientX - (panelRect.left + panelRect.width / 2),
       offsetY: event.clientY - panelRect.top,
     };
     setIsDragging(true);
@@ -184,6 +154,7 @@ export function useDraggableFloatingPanel<T extends HTMLElement>(enabled = true)
     panelRef,
     panelStyle,
     isDragging,
+    clampAnchor,
     dragHandleProps: {
       onPointerCancel: finishDrag,
       onPointerDown,

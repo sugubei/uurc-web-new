@@ -14,7 +14,9 @@ describe("RemoteShortcutMenu", () => {
 
   it("opens upward when the toolbar is near the bottom", async () => {
     const user = userEvent.setup();
-    const { container } = render(<RemoteShortcutMenu disabled={false} platformKey="mac" onRemoteShortcut={vi.fn()} />);
+    const { container } = render(
+      <RemoteShortcutMenu disabled={false} platformKey="mac" onOpenChange={vi.fn()} onRemoteShortcut={vi.fn()} />,
+    );
     const details = container.querySelector("details") as HTMLDetailsElement;
     const summary = container.querySelector("summary") as HTMLElement;
     const panel = screen.getByRole("menu", { name: "远控快捷键" });
@@ -35,7 +37,9 @@ describe("RemoteShortcutMenu", () => {
 
   it("opens downward when there is more room below the toolbar", async () => {
     const user = userEvent.setup();
-    const { container } = render(<RemoteShortcutMenu disabled={false} platformKey="mac" onRemoteShortcut={vi.fn()} />);
+    const { container } = render(
+      <RemoteShortcutMenu disabled={false} platformKey="mac" onOpenChange={vi.fn()} onRemoteShortcut={vi.fn()} />,
+    );
     const details = container.querySelector("details") as HTMLDetailsElement;
     const summary = container.querySelector("summary") as HTMLElement;
     const panel = screen.getByRole("menu", { name: "远控快捷键" });
@@ -56,7 +60,9 @@ describe("RemoteShortcutMenu", () => {
     vi.stubGlobal("innerWidth", 390);
     vi.stubGlobal("innerHeight", 844);
     const user = userEvent.setup();
-    const { container } = render(<RemoteShortcutMenu disabled={false} platformKey="mac" onRemoteShortcut={vi.fn()} />);
+    const { container } = render(
+      <RemoteShortcutMenu disabled={false} platformKey="mac" onOpenChange={vi.fn()} onRemoteShortcut={vi.fn()} />,
+    );
     const details = container.querySelector("details") as HTMLDetailsElement;
     const summary = container.querySelector("summary") as HTMLElement;
     const panel = screen.getByRole("menu", { name: "远控快捷键" });
@@ -80,7 +86,9 @@ describe("RemoteShortcutMenu", () => {
     vi.stubGlobal("innerWidth", 300);
     vi.stubGlobal("innerHeight", 844);
     const user = userEvent.setup();
-    const { container } = render(<RemoteShortcutMenu disabled={false} platformKey="mac" onRemoteShortcut={vi.fn()} />);
+    const { container } = render(
+      <RemoteShortcutMenu disabled={false} platformKey="mac" onOpenChange={vi.fn()} onRemoteShortcut={vi.fn()} />,
+    );
     const details = container.querySelector("details") as HTMLDetailsElement;
     const summary = container.querySelector("summary") as HTMLElement;
     const panel = screen.getByRole("menu", { name: "远控快捷键" });

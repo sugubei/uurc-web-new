@@ -1,12 +1,16 @@
+.command-dock-tab,
 .command-drag-handle {
   touch-action: none;
 }
 
 .control-command-bar {
-  /* 默认停靠在画面底部居中；从把手拖动后切到 fixed 视口坐标，并约束在远控画布内。 */
+  /* 默认停靠在画面顶部居中。折叠态与展开态共用「水平中心 + 顶边」这一个锚点，
+     收起和展开只改变宽度，位置不会跳动；拖动后切到 fixed 视口坐标，可停到顶栏等画面之外的位置。 */
   position: absolute;
+  top: 10px;
   left: 50%;
-  bottom: 20px;
+  /* transform 承担定位，不要把它加进 transition：首次拖动时内联样式从 CSS 值切到
+     另一个值会被补间，工具栏会先闪到左边再弹回指针位置。 */
   transform: translateX(-50%);
   z-index: 5;
   display: flex;
@@ -27,20 +31,35 @@
   -webkit-backdrop-filter: blur(14px);
   overflow: visible;
   touch-action: pan-x;
-  transition:
-    opacity 0.2s ease,
-    transform 0.2s ease;
 }
 
-.control-stage-frame--fullscreen .control-command-bar {
-  top: 16px;
-  bottom: auto;
+/* 折叠态只剩一个贴住锚点的小箭头，鼠标移入或点击即展开。
+   hover 反馈落在外层这一小条上，箭头自身不描边，避免两层边框叠在一起。 */
+.control-command-bar--collapsed {
+  gap: 0;
+  padding: 2px;
+  border-radius: var(--radius);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
 }
 
-.control-command-bar--idle-hidden {
-  opacity: 0;
-  pointer-events: none;
-  transform: translate(-50%, 6px);
+.control-command-bar--collapsed:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(42, 42, 48, 0.96);
+}
+
+.control-command-bar--collapsed .command-dock-tab,
+.control-command-bar--collapsed .command-dock-tab:hover:not(:disabled) {
+  width: 34px;
+  min-height: 20px;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: grab;
+}
+
+.control-command-bar--collapsed .command-dock-tab:active {
+  cursor: grabbing;
 }
 
 .fullscreen-hint {
@@ -71,10 +90,18 @@
   cursor: grabbing;
 }
 
-/* 顶部悬浮重连恢复条：画面保留最后一帧，恢复条居中浮在其上。 */
+/* 收起按钮压在工具栏末端，颜色弱一档，避免和远控操作按钮抢注意力。 */
+.control-command-bar .command-collapse-button {
+  width: 30px;
+  padding: 0;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* 顶部悬浮重连恢复条：画面保留最后一帧，恢复条居中浮在其上。
+   默认停靠在画面顶部的工具栏占据 10px~60px，恢复条排在它下面，两者不会互相盖住。 */
 .reconnect-banner {
   position: absolute;
-  top: 14px;
+  top: 68px;
   left: 50%;
   translate: -50% 0;
   transform-origin: center top;
