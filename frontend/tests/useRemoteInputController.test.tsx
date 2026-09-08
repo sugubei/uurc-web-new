@@ -48,6 +48,7 @@ describe("useRemoteInputController", () => {
       sendMouseMove: vi.fn((input, options) => calls.push({ kind: "move", input, critical: options?.critical })),
       sendMouseButton: vi.fn((input) => calls.push({ kind: "button", input })),
       releaseAllInputs: vi.fn(),
+      releaseOrphanModifiers: vi.fn(),
     } as unknown as BrowserRemoteSession;
     let controller: ReturnType<typeof useRemoteInputController> | undefined;
 
@@ -107,6 +108,7 @@ describe("useRemoteInputController", () => {
       }),
       sendMouseButton: vi.fn(),
       releaseAllInputs: vi.fn(),
+      releaseOrphanModifiers: vi.fn(),
     } as unknown as BrowserRemoteSession;
     let controller: ReturnType<typeof useRemoteInputController> | undefined;
 
@@ -139,6 +141,7 @@ describe("useRemoteInputController", () => {
     const session = {
       sendKeyboardInput,
       releaseAllInputs: vi.fn(),
+      releaseOrphanModifiers: vi.fn(),
     } as unknown as BrowserRemoteSession;
     const view = render(<Harness session={session} onController={() => undefined} targetPlatform={4} />);
     const stage = view.getByTestId("stage");
@@ -165,6 +168,7 @@ describe("useRemoteInputController", () => {
       sendMouseMove: vi.fn(),
       sendPastedText,
       releaseAllInputs: vi.fn(),
+      releaseOrphanModifiers: vi.fn(),
     } as unknown as BrowserRemoteSession;
     const view = render(<Harness session={session} onController={() => undefined} targetPlatform={4} />);
     const stage = view.getByTestId("stage") as HTMLDivElement;
@@ -215,6 +219,7 @@ describe("useRemoteInputController", () => {
       sendKeyboardInput,
       sendPastedText,
       releaseAllInputs: vi.fn(),
+      releaseOrphanModifiers: vi.fn(),
     } as unknown as BrowserRemoteSession;
     const view = render(<Harness session={session} onController={() => undefined} targetPlatform={4} />);
     const stage = view.getByTestId("stage");
@@ -257,6 +262,7 @@ describe("useRemoteInputController", () => {
       sendKeyboardInput: vi.fn(),
       sendPastedText,
       releaseAllInputs: vi.fn(),
+      releaseOrphanModifiers: vi.fn(),
     } as unknown as BrowserRemoteSession;
     const view = render(<Harness session={session} onController={() => undefined} targetPlatform={4} />);
     const stage = view.getByTestId("stage");
@@ -280,6 +286,7 @@ describe("useRemoteInputController", () => {
       sendKeyboardInput,
       sendPastedText,
       releaseAllInputs: vi.fn(),
+      releaseOrphanModifiers: vi.fn(),
     } as unknown as BrowserRemoteSession;
     const view = render(<Harness session={session} onController={() => undefined} targetPlatform={4} />);
     const stage = view.getByTestId("stage");
@@ -318,6 +325,7 @@ describe("useRemoteInputController", () => {
       sendKeyboardInput: vi.fn(),
       sendPastedText,
       releaseAllInputs: vi.fn(),
+      releaseOrphanModifiers: vi.fn(),
     } as unknown as BrowserRemoteSession;
     const view = render(<Harness session={session} onController={() => undefined} targetPlatform={4} />);
     const stage = view.getByTestId("stage");
@@ -345,6 +353,7 @@ describe("useRemoteInputController", () => {
       sendMouseMove: vi.fn(),
       sendPastedText,
       releaseAllInputs: vi.fn(),
+      releaseOrphanModifiers: vi.fn(),
     } as unknown as BrowserRemoteSession;
     const view = render(<Harness session={session} onController={() => undefined} targetPlatform={4} />);
     const stage = view.getByTestId("stage");
@@ -368,6 +377,7 @@ describe("useRemoteInputController", () => {
       sendKeyboardInput,
       sendPastedText,
       releaseAllInputs: vi.fn(),
+      releaseOrphanModifiers: vi.fn(),
     } as unknown as BrowserRemoteSession;
     const view = render(
       <Harness
@@ -403,6 +413,7 @@ describe("useRemoteInputController", () => {
       }),
       sendPastedText,
       releaseAllInputs: vi.fn(),
+      releaseOrphanModifiers: vi.fn(),
     } as unknown as BrowserRemoteSession;
     const view = render(
       <Harness session={session} onController={() => undefined} onError={onError} targetPlatform={4} />,
@@ -428,6 +439,7 @@ describe("useRemoteInputController", () => {
       sendKeyboardInput,
       sendPastedText,
       releaseAllInputs: vi.fn(),
+      releaseOrphanModifiers: vi.fn(),
     } as unknown as BrowserRemoteSession;
     const view = render(<Harness session={session} onController={() => undefined} targetPlatform={4} />);
     const stage = view.getByTestId("stage");
@@ -494,6 +506,66 @@ describe("useRemoteInputController", () => {
     expect(controller?.inputControlActive).toBe(false);
   });
 
+  it("reconciles held modifiers against the browser state on every key press", async () => {
+    const releaseOrphanModifiers = vi.fn();
+    const session = {
+      sendKeyboardInput: vi.fn(),
+      releaseAllInputs: vi.fn(),
+      releaseOrphanModifiers,
+    } as unknown as BrowserRemoteSession;
+    let controller: ReturnType<typeof useRemoteInputController> | undefined;
+
+    const view = render(
+      <Harness
+        session={session}
+        onController={(nextController) => {
+          controller = nextController;
+        }}
+      />,
+    );
+    await waitFor(() => expect(controller?.inputControlActive).toBe(true));
+    const stage = view.getByTestId("stage");
+
+    fireEvent.keyDown(stage, { code: "KeyA", key: "a", ctrlKey: true });
+    const heldWhilePressed = releaseOrphanModifiers.mock.calls.at(-1)![0] as (family: string) => boolean;
+    expect(heldWhilePressed("Control")).toBe(true);
+    expect(heldWhilePressed("Shift")).toBe(false);
+
+    fireEvent.keyDown(stage, { code: "KeyB", key: "b" });
+    const heldAfterSwallowedKeyUp = releaseOrphanModifiers.mock.calls.at(-1)![0] as (family: string) => boolean;
+    expect(heldAfterSwallowedKeyUp("Control")).toBe(false);
+  });
+
+  it("reconciles held modifiers on pointer down so a mouse-only session can recover too", async () => {
+    const releaseOrphanModifiers = vi.fn();
+    const session = {
+      sendMouseMove: vi.fn(),
+      sendMouseButton: vi.fn(),
+      releaseAllInputs: vi.fn(),
+      releaseOrphanModifiers,
+    } as unknown as BrowserRemoteSession;
+    let controller: ReturnType<typeof useRemoteInputController> | undefined;
+
+    const view = render(
+      <Harness
+        session={session}
+        onController={(nextController) => {
+          controller = nextController;
+        }}
+      />,
+    );
+    await waitFor(() => expect(controller?.inputControlActive).toBe(true));
+    const stage = view.getByTestId("stage") as HTMLDivElement;
+    stage.getBoundingClientRect = () => new DOMRect(0, 0, 1000, 500);
+    const video = stage.querySelector("video")!;
+    Object.defineProperty(video, "videoWidth", { value: 1000, configurable: true });
+    Object.defineProperty(video, "videoHeight", { value: 500, configurable: true });
+
+    act(() => controller?.handleRemoteStagePointerDown(pointerEvent(stage, 10, 20)));
+
+    expect(releaseOrphanModifiers).toHaveBeenCalledOnce();
+  });
+
   function flushFrames(): void {
     const callbacks = [...frameCallbacks.values()];
     frameCallbacks.clear();
@@ -555,5 +627,6 @@ function pointerEvent(stage: HTMLDivElement, clientX: number, clientY: number) {
     currentTarget: stage,
     pointerId: 1,
     preventDefault: vi.fn(),
+    nativeEvent: { getModifierState: () => false },
   } as unknown as Parameters<ReturnType<typeof useRemoteInputController>["handleRemoteStagePointerMove"]>[0];
 }

@@ -9,6 +9,7 @@ import {
 import { STREAMER_ICE_NETWORK_TYPES, type StreamerIceNetworkType } from "@uurc/shared/streamer/signalSoac";
 import { STREAMER_DATA_CHANNEL_LABELS, type StreamerDataChannelLabel } from "@uurc/shared/streamer/transport";
 import type { RemoteSignalGatewayEvent } from "@uurc/shared/signalGateway/model";
+import type { RemoteModifierFamily } from "./androidKeyCodes.js";
 import { BrowserRemoteChannels } from "./browserRemote/channels.js";
 import { BrowserRemoteClipboard } from "./browserRemote/clipboard.js";
 import {
@@ -402,6 +403,10 @@ export class BrowserRemoteSession {
 
   releaseAllInputs(): void {
     this.input.releaseAll();
+  }
+
+  releaseOrphanModifiers(isModifierDown: (family: RemoteModifierFamily) => boolean): void {
+    this.input.releaseOrphanModifiers(isModifierDown);
   }
 
   async refreshConnectionStats(): Promise<BrowserRemoteSessionState> {

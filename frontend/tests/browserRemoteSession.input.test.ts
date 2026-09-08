@@ -510,4 +510,34 @@ describe("BrowserRemoteSession", () => {
       }),
     ]);
   });
+
+  it("releases held modifiers the browser no longer reports as pressed", async () => {
+    const api = new FakeRemoteApi();
+    const peer = new FakePeerConnection();
+    const session = new BrowserRemoteSession({
+      api,
+      createPeerConnection: () => peer,
+      now: () => 9000,
+    });
+    await session.start({ appControlId: "control-1", appDataBase64: "Cg==", streamerData: "{}" });
+
+    const control = peer.channels.get(STREAMER_DATA_CHANNEL_LABELS.control)!;
+    session.sendKeyboardInput({ action: "keyboardPress", value: 113 });
+    session.sendKeyboardInput({ action: "keyboardPress", value: 59 });
+    control.sent.length = 0;
+
+    session.releaseOrphanModifiers((family) => family === "Shift");
+
+    expect(control.sent).toEqual([
+      encodeStreamerInputMessage({
+        sequence: 3,
+        timestampMs: 9,
+        inputMessage: buildStreamerKeyboardInputMessage({ action: "keyboardRelease", value: 113 }),
+      }),
+    ]);
+
+    control.sent.length = 0;
+    session.releaseOrphanModifiers((family) => family === "Shift");
+    expect(control.sent).toEqual([]);
+  });
 });

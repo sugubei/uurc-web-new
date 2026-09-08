@@ -11,7 +11,11 @@ import {
   type StreamerMouseButtonKind,
 } from "@uurc/shared/streamer/inputDesktop";
 import { STREAMER_MAX_DATA_BUFFER_BYTES } from "@uurc/shared/streamer/transport";
-import { REMOTE_MODIFIER_KEY_CODES } from "../androidKeyCodes.js";
+import {
+  REMOTE_MODIFIER_FAMILY_BY_KEY_CODE,
+  REMOTE_MODIFIER_KEY_CODES,
+  type RemoteModifierFamily,
+} from "../androidKeyCodes.js";
 import type {
   BrowserRemoteDataChannel,
   BrowserRemoteKeyboardInput,
@@ -143,6 +147,23 @@ export class BrowserRemoteInput {
         if (typeof value === "number" && REMOTE_MODIFIER_KEY_CODES.has(value)) {
           this.options.sendInputData(this.buildKeyboardInput({ action: "keyboardPress", value }));
         }
+        this.options.sendInputData(this.buildKeyboardInput({ action: "keyboardRelease", value }));
+        this.heldKeyboardValues.delete(value);
+      } catch {
+        // The channel may be temporarily unavailable; retain the held state for a later retry.
+      }
+    }
+  }
+
+  // 截屏软件一类的全局快捷键，可能在浏览器仍是前台窗口时就把修饰键的 keyup 吞掉，
+  // 这时 blur 和 visibilitychange 都不触发，记录里会留下永远放不掉的键。
+  // 拿浏览器的真实修饰键状态校对一次，把已经抬起却还留在记录里的键释放掉。
+  releaseOrphanModifiers(isModifierDown: (family: RemoteModifierFamily) => boolean): void {
+    for (const value of [...this.heldKeyboardValues]) {
+      if (typeof value !== "number") continue;
+      const family = REMOTE_MODIFIER_FAMILY_BY_KEY_CODE.get(value);
+      if (!family || isModifierDown(family)) continue;
+      try {
         this.options.sendInputData(this.buildKeyboardInput({ action: "keyboardRelease", value }));
         this.heldKeyboardValues.delete(value);
       } catch {

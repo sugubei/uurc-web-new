@@ -232,6 +232,9 @@ export function useRemoteInputController({
   function handleRemoteStagePointerDown(event: PointerEvent<HTMLDivElement>): void {
     const session = browserSessionRef.current;
     if (!inputControlActive || !session) return;
+    // 截屏之后如果只用鼠标操作，也要有校对的机会，否则被吞掉的修饰键会一直卡着。
+    const pointerNativeEvent = event.nativeEvent;
+    session.releaseOrphanModifiers((family) => pointerNativeEvent.getModifierState(family));
     pasteRevisionRef.current += 1;
     event.preventDefault();
     event.currentTarget.focus();
@@ -320,6 +323,11 @@ export function useRemoteInputController({
   function handleRemoteStageKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
     const session = browserSessionRef.current;
     if (!inputControlActive || !session || event.nativeEvent.isComposing) return;
+    // 截屏软件一类的全局快捷键会吞掉修饰键的 keyup，而浏览器仍是前台窗口，
+    // blur 和 visibilitychange 都不触发。每次按键都用浏览器真实状态校对一次，
+    // 把记录里已经抬起的修饰键放掉。
+    const nativeEvent = event.nativeEvent;
+    session.releaseOrphanModifiers((family) => nativeEvent.getModifierState(family));
     if (isPasteShortcut(event)) {
       if (event.repeat) {
         event.preventDefault();

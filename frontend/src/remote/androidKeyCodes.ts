@@ -62,21 +62,27 @@ for (let index = 0; index < 26; index += 1) {
   ANDROID_KEY_CODES_BY_DOM_CODE[`Key${String.fromCharCode(65 + index)}`] = 29 + index;
 }
 
-const MODIFIER_DOM_CODES = [
-  "AltLeft",
-  "AltRight",
-  "ControlLeft",
-  "ControlRight",
-  "MetaLeft",
-  "MetaRight",
-  "ShiftLeft",
-  "ShiftRight",
+export type RemoteModifierFamily = "Alt" | "Control" | "Meta" | "Shift";
+
+// getModifierState 分不出左右两侧，所以修饰键按族归组。
+const MODIFIER_FAMILIES: ReadonlyArray<{ family: RemoteModifierFamily; codes: readonly string[] }> = [
+  { family: "Alt", codes: ["AltLeft", "AltRight"] },
+  { family: "Control", codes: ["ControlLeft", "ControlRight"] },
+  { family: "Meta", codes: ["MetaLeft", "MetaRight"] },
+  { family: "Shift", codes: ["ShiftLeft", "ShiftRight"] },
 ];
 
 // 修饰键的 Android keycode（含左右两侧）。被控端会忽略没有按下记录的释放，
 // 所以清理这些键时要先补一次按下，让被控端把记录建回来。
 export const REMOTE_MODIFIER_KEY_CODES: ReadonlySet<number> = new Set(
-  MODIFIER_DOM_CODES.map((code) => ANDROID_KEY_CODES_BY_DOM_CODE[code]),
+  MODIFIER_FAMILIES.flatMap(({ codes }) => codes.map((code) => ANDROID_KEY_CODES_BY_DOM_CODE[code])),
+);
+
+// keycode 到修饰键族的映射，用于拿浏览器真实状态校对按下记录。
+export const REMOTE_MODIFIER_FAMILY_BY_KEY_CODE: ReadonlyMap<number, RemoteModifierFamily> = new Map(
+  MODIFIER_FAMILIES.flatMap(({ family, codes }) =>
+    codes.map((code): [number, RemoteModifierFamily] => [ANDROID_KEY_CODES_BY_DOM_CODE[code], family]),
+  ),
 );
 
 export function toAndroidKeyCodeFromDomEvent(event: DomKeyboardEventLike): string | number {
