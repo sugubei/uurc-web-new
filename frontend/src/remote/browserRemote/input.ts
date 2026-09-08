@@ -11,6 +11,7 @@ import {
   type StreamerMouseButtonKind,
 } from "@uurc/shared/streamer/inputDesktop";
 import { STREAMER_MAX_DATA_BUFFER_BYTES } from "@uurc/shared/streamer/transport";
+import { REMOTE_MODIFIER_KEY_CODES } from "../androidKeyCodes.js";
 import type {
   BrowserRemoteDataChannel,
   BrowserRemoteKeyboardInput,
@@ -137,6 +138,11 @@ export class BrowserRemoteInput {
     }
     for (const value of keys) {
       try {
+        // 修饰键先补一次按下：被控端会忽略没有按下记录的释放，卡住的键就是这样再也放不开的。
+        // 普通键不补，避免在远端多敲出一个字符。
+        if (typeof value === "number" && REMOTE_MODIFIER_KEY_CODES.has(value)) {
+          this.options.sendInputData(this.buildKeyboardInput({ action: "keyboardPress", value }));
+        }
         this.options.sendInputData(this.buildKeyboardInput({ action: "keyboardRelease", value }));
         this.heldKeyboardValues.delete(value);
       } catch {

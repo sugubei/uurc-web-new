@@ -130,8 +130,17 @@ export function useRemoteInputController({
       scrollDeltaAccumulatorRef.current.reset();
       cancelPendingPointerMove();
       clearClipboardShortcutState();
+      // 通道断开后 keyup 会被 inputControlActive 拦掉，先在这里把按住的键放掉。
+      // 发送失败时 releaseAll 会保留记录，等通道恢复后补发。
+      browserSessionRef.current?.releaseAllInputs();
     }
-  }, [cancelPendingPointerMove, clearClipboardShortcutState, controlChannelState, inputControlEnabled]);
+  }, [
+    browserSessionRef,
+    cancelPendingPointerMove,
+    clearClipboardShortcutState,
+    controlChannelState,
+    inputControlEnabled,
+  ]);
 
   useEffect(() => {
     scrollDeltaAccumulatorRef.current.reset();
@@ -145,9 +154,11 @@ export function useRemoteInputController({
     }
     if (controlChannelOpenedRef.current) return;
     controlChannelOpenedRef.current = true;
+    // 补发通道断开期间没能发出去的释放，避免上一次的按键状态残留到这一次。
+    browserSessionRef.current?.releaseAllInputs();
     setInputControlEnabled(true);
     remoteStageRef.current?.focus();
-  }, [controlChannelState]);
+  }, [browserSessionRef, controlChannelState]);
 
   useEffect(() => {
     const releaseHeldInputs = () => {
@@ -187,6 +198,8 @@ export function useRemoteInputController({
     scrollDeltaAccumulatorRef.current.reset();
     cancelPendingPointerMove();
     clearClipboardShortcutState();
+    // 切到仅观看后 keyup 同样会被 inputControlActive 拦掉，先释放按住的键。
+    browserSessionRef.current?.releaseAllInputs();
     setInputControlEnabled(false);
   }
 

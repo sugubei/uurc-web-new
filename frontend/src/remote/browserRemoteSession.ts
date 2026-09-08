@@ -185,6 +185,12 @@ export class BrowserRemoteSession {
       iceId: this.iceId,
     });
     this.clipboard.reset("浏览器远控会话已关闭");
+    try {
+      // 必须在关闭通道之前释放：通道一关，按住的修饰键就再也通知不到被控端。
+      this.input.releaseAll();
+    } catch {
+      // 释放失败不阻止关闭，随后的 input.reset() 会清空本地记录。
+    }
     this.channels.closeAll();
     if (this.peer) {
       this.peer.ondatachannel = null;

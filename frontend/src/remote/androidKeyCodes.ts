@@ -62,6 +62,23 @@ for (let index = 0; index < 26; index += 1) {
   ANDROID_KEY_CODES_BY_DOM_CODE[`Key${String.fromCharCode(65 + index)}`] = 29 + index;
 }
 
+const MODIFIER_DOM_CODES = [
+  "AltLeft",
+  "AltRight",
+  "ControlLeft",
+  "ControlRight",
+  "MetaLeft",
+  "MetaRight",
+  "ShiftLeft",
+  "ShiftRight",
+];
+
+// 修饰键的 Android keycode（含左右两侧）。被控端会忽略没有按下记录的释放，
+// 所以清理这些键时要先补一次按下，让被控端把记录建回来。
+export const REMOTE_MODIFIER_KEY_CODES: ReadonlySet<number> = new Set(
+  MODIFIER_DOM_CODES.map((code) => ANDROID_KEY_CODES_BY_DOM_CODE[code]),
+);
+
 export function toAndroidKeyCodeFromDomEvent(event: DomKeyboardEventLike): string | number {
   return ANDROID_KEY_CODES_BY_DOM_CODE[event.code] ?? event.key;
 }

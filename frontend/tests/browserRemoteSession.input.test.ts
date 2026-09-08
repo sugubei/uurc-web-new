@@ -445,4 +445,69 @@ describe("BrowserRemoteSession", () => {
     session.releaseAllInputs();
     expect(control.sent).toEqual([]);
   });
+
+  it("re-presses a held modifier before releasing it so the target cannot ignore the release", async () => {
+    const api = new FakeRemoteApi();
+    const peer = new FakePeerConnection();
+    const session = new BrowserRemoteSession({
+      api,
+      createPeerConnection: () => peer,
+      now: () => 9000,
+    });
+    await session.start({ appControlId: "control-1", appDataBase64: "Cg==", streamerData: "{}" });
+
+    const control = peer.channels.get(STREAMER_DATA_CHANNEL_LABELS.control)!;
+    session.sendKeyboardInput({ action: "keyboardPress", value: 113 });
+    control.sent.length = 0;
+
+    session.releaseAllInputs();
+
+    expect(control.sent).toEqual([
+      encodeStreamerInputMessage({
+        sequence: 2,
+        timestampMs: 9,
+        inputMessage: buildStreamerKeyboardInputMessage({ action: "keyboardPress", value: 113 }),
+      }),
+      encodeStreamerInputMessage({
+        sequence: 3,
+        timestampMs: 9,
+        inputMessage: buildStreamerKeyboardInputMessage({ action: "keyboardRelease", value: 113 }),
+      }),
+    ]);
+
+    control.sent.length = 0;
+    session.releaseAllInputs();
+    expect(control.sent).toEqual([]);
+  });
+
+  it("releases held keys before the control channel is closed", async () => {
+    const api = new FakeRemoteApi();
+    const peer = new FakePeerConnection();
+    const session = new BrowserRemoteSession({
+      api,
+      createPeerConnection: () => peer,
+      now: () => 9000,
+    });
+    await session.start({ appControlId: "control-1", appDataBase64: "Cg==", streamerData: "{}" });
+
+    const control = peer.channels.get(STREAMER_DATA_CHANNEL_LABELS.control)!;
+    session.sendKeyboardInput({ action: "keyboardPress", value: 113 });
+    control.sent.length = 0;
+
+    session.close();
+
+    expect(control.readyState).toBe("closed");
+    expect(control.sent).toEqual([
+      encodeStreamerInputMessage({
+        sequence: 2,
+        timestampMs: 9,
+        inputMessage: buildStreamerKeyboardInputMessage({ action: "keyboardPress", value: 113 }),
+      }),
+      encodeStreamerInputMessage({
+        sequence: 3,
+        timestampMs: 9,
+        inputMessage: buildStreamerKeyboardInputMessage({ action: "keyboardRelease", value: 113 }),
+      }),
+    ]);
+  });
 });

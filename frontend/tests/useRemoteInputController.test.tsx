@@ -450,6 +450,50 @@ describe("useRemoteInputController", () => {
     expect(sendPastedText).toHaveBeenCalledWith("pasted from browser");
   });
 
+  it("releases held keys when the control channel drops and flushes them again when it reopens", async () => {
+    const releaseAllInputs = vi.fn();
+    const session = { sendKeyboardInput: vi.fn(), releaseAllInputs } as unknown as BrowserRemoteSession;
+    let controller: ReturnType<typeof useRemoteInputController> | undefined;
+    const onController = (nextController: ReturnType<typeof useRemoteInputController>) => {
+      controller = nextController;
+    };
+
+    const view = render(<Harness session={session} controlChannelState="open" onController={onController} />);
+    await waitFor(() => expect(controller?.inputControlActive).toBe(true));
+
+    releaseAllInputs.mockClear();
+    view.rerender(<Harness session={session} controlChannelState="connecting" onController={onController} />);
+    await waitFor(() => expect(controller?.inputControlActive).toBe(false));
+    expect(releaseAllInputs).toHaveBeenCalled();
+
+    releaseAllInputs.mockClear();
+    view.rerender(<Harness session={session} controlChannelState="open" onController={onController} />);
+    await waitFor(() => expect(controller?.inputControlActive).toBe(true));
+    expect(releaseAllInputs).toHaveBeenCalled();
+  });
+
+  it("releases held keys when input control is turned off for view-only mode", async () => {
+    const releaseAllInputs = vi.fn();
+    const session = { sendKeyboardInput: vi.fn(), releaseAllInputs } as unknown as BrowserRemoteSession;
+    let controller: ReturnType<typeof useRemoteInputController> | undefined;
+
+    render(
+      <Harness
+        session={session}
+        onController={(nextController) => {
+          controller = nextController;
+        }}
+      />,
+    );
+    await waitFor(() => expect(controller?.inputControlActive).toBe(true));
+
+    releaseAllInputs.mockClear();
+    act(() => controller?.resetInputControl());
+
+    expect(releaseAllInputs).toHaveBeenCalledOnce();
+    expect(controller?.inputControlActive).toBe(false);
+  });
+
   function flushFrames(): void {
     const callbacks = [...frameCallbacks.values()];
     frameCallbacks.clear();
@@ -465,17 +509,19 @@ function Harness({
   onController,
   onSessionStateChange = () => undefined,
   targetPlatform = 1,
+  controlChannelState = "open",
 }: {
   session: BrowserRemoteSession;
   onError?: (message: string) => void;
   onController(controller: ReturnType<typeof useRemoteInputController>): void;
   onSessionStateChange?: (state: ReturnType<BrowserRemoteSession["getState"]>) => void;
   targetPlatform?: number;
+  controlChannelState?: RTCDataChannelState;
 }) {
   const browserSessionRef = { current: session };
   const controller = useRemoteInputController({
     browserSessionRef,
-    controlChannelState: "open",
+    controlChannelState,
     targetPlatform,
     primaryRemoteVideoId: "video-1",
     remoteStageViewMode: "fit",
